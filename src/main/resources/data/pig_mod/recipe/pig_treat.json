@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "pig_mod:sack" },
+    { "item": "minecraft:carrot" },
+    { "item": "minecraft:wheat" }
+  ],
+  "result": {
+    "id": "pig_mod:pig_treat",
+    "count": 1
+  }
+}

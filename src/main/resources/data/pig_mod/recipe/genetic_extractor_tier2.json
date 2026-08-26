@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "GDG",
+    "GTG",
+    "GDG"
+  ],
+  "key": {
+    "G": { "item": "minecraft:gold_ingot" },
+    "D": { "item": "minecraft:diamond" },
+    "T": { "item": "pig_mod:genetic_extractor_tier1" }
+  },
+  "result": {
+    "id": "pig_mod:genetic_extractor_tier2",
+    "count": 1
+  }
+}

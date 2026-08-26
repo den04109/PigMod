@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " I ",
+    " G ",
+    "I I"
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "G": { "item": "minecraft:glass_bottle" }
+  },
+  "result": {
+    "id": "pig_mod:genetic_injector",
+    "count": 1
+  }
+}

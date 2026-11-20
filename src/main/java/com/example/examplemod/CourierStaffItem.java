@@ -62,7 +62,7 @@ public class CourierStaffItem extends Item {
             setBoundChest(stack, pos);
             Player player = context.getPlayer();
             if (player != null) {
-                player.displayClientMessage(Component.literal("Посох привязан к этому хранилищу").withStyle(ChatFormatting.GREEN), true);
+                player.displayClientMessage(Component.translatable("message.pig_mod.courier_staff.bound").withStyle(ChatFormatting.GREEN), true);
             }
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
@@ -72,10 +72,10 @@ public class CourierStaffItem extends Item {
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         BlockPos pos = getBoundChest(stack);
         if (pos == null) {
-            tooltip.add(Component.literal("Не привязан — ПКМ по сундуку/хранилищу").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.translatable("tooltip.pig_mod.courier_staff.unbound").withStyle(ChatFormatting.GRAY));
         } else {
-            tooltip.add(Component.literal("Привязан к: " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ()).withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("ПКМ по своей свинье с мутацией \"Курьер\", чтобы привязать её").withStyle(ChatFormatting.DARK_GRAY));
+            tooltip.add(Component.translatable("tooltip.pig_mod.courier_staff.bound_to", pos.getX(), pos.getY(), pos.getZ()).withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.translatable("tooltip.pig_mod.courier_staff.bind_hint", Component.translatable("mutation.pig_mod.courier")).withStyle(ChatFormatting.DARK_GRAY));
         }
     }
 }

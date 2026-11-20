@@ -137,36 +137,23 @@ public class GeneticExtractorBlockEntity extends BaseContainerBlockEntity {
             if (definition.getCatalystItem() == null || !catalyst.is(definition.getCatalystItem())) {
                 continue;
             }
-            if (matchesCarriers(definition.getCarrierIngredients())) {
+            if (definition.matchesCarriers(placedCarriers())) {
                 return definition;
             }
         }
         return null;
     }
 
-    /** Точное (мультимножественное) соответствие занятых слотов-носителей списку требуемых предметов. */
-    private boolean matchesCarriers(List<net.minecraft.world.item.Item> required) {
-        List<net.minecraft.world.item.Item> remaining = new ArrayList<>(required);
-        int usedSlots = 0;
+    /** Непустые стаки из слотов-носителей (сама проверка рецепта — в MutationDefinition.matchesCarriers). */
+    private List<ItemStack> placedCarriers() {
+        List<ItemStack> placed = new ArrayList<>();
         for (int i = 0; i < tier; i++) {
             ItemStack stack = items.get(getCarrierSlotStart() + i);
-            if (stack.isEmpty()) {
-                continue;
-            }
-            usedSlots++;
-            boolean matchedOne = false;
-            for (int j = 0; j < remaining.size(); j++) {
-                if (stack.is(remaining.get(j))) {
-                    remaining.remove(j);
-                    matchedOne = true;
-                    break;
-                }
-            }
-            if (!matchedOne) {
-                return false; // лишний/не тот предмет в носителях
+            if (!stack.isEmpty()) {
+                placed.add(stack);
             }
         }
-        return remaining.isEmpty() && usedSlots == required.size();
+        return placed;
     }
 
     private boolean canInsertResult(MutationDefinition definition) {
@@ -181,18 +168,12 @@ public class GeneticExtractorBlockEntity extends BaseContainerBlockEntity {
     private void craft(MutationDefinition definition) {
         items.get(getBaseSlot()).shrink(1);
 
-        List<net.minecraft.world.item.Item> required = new ArrayList<>(definition.getCarrierIngredients());
-        for (int i = 0; i < tier && !required.isEmpty(); i++) {
+        // Рецепт уже подтверждён (matchesCarriers): каждый занятый слот-носитель ровно один раз
+        // участвует в рецепте, поэтому просто списываем по одному предмету из каждого.
+        for (int i = 0; i < tier; i++) {
             ItemStack stack = items.get(getCarrierSlotStart() + i);
-            if (stack.isEmpty()) {
-                continue;
-            }
-            for (int j = 0; j < required.size(); j++) {
-                if (stack.is(required.get(j))) {
-                    stack.shrink(1);
-                    required.remove(j);
-                    break;
-                }
+            if (!stack.isEmpty()) {
+                stack.shrink(1);
             }
         }
 
@@ -209,7 +190,9 @@ public class GeneticExtractorBlockEntity extends BaseContainerBlockEntity {
 
     public static void serverTick(net.minecraft.world.level.Level level, BlockPos pos, BlockState state, GeneticExtractorBlockEntity be) {
         MutationDefinition match = be.findMatchingMutation();
-        if (match != null && be.canInsertResult(match)) {
+        boolean crafting = match != null && be.canInsertResult(match);
+
+        if (crafting) {
             be.progress++;
             if (be.progress >= PROCESS_TIME) {
                 be.craft(match);
@@ -220,6 +203,12 @@ public class GeneticExtractorBlockEntity extends BaseContainerBlockEntity {
             // Рецепт разобрали/сломали — прогресс медленно откатывается, а не сбрасывается мгновенно
             be.progress = Math.max(0, be.progress - 2);
             be.setChanged();
+        }
+
+        // Свойство ACTIVE переключает модель на анимированную спираль ДНК (см. GeneticExtractorBlock)
+        // — как lit у печи, меняем блокстейт только на самих переходах, а не каждый тик.
+        if (state.getValue(GeneticExtractorBlock.ACTIVE) != crafting) {
+            level.setBlock(pos, state.setValue(GeneticExtractorBlock.ACTIVE, crafting), 3);
         }
     }
 

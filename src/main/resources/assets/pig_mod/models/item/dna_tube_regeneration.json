@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "pig_mod:item/dna_tube_regeneration"
+  }
+}

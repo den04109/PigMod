@@ -57,13 +57,10 @@ public class UpgradeItem extends Item {
         int exp = getExp(stack);
         int expNeeded = level * 20;
 
-        tooltipComponents.add(Component.literal("Тип: ").withStyle(ChatFormatting.GRAY)
-                .append(Component.literal(this.upgradeName).withStyle(ChatFormatting.GOLD)));
+        tooltipComponents.add(Component.translatable("tooltip.pig_mod.upgrade.type", Component.translatable(this.upgradeName).withStyle(ChatFormatting.GOLD)).withStyle(ChatFormatting.GRAY));
         
-        tooltipComponents.add(Component.literal("Уровень: ").withStyle(ChatFormatting.GRAY)
-                .append(Component.literal(String.valueOf(level)).withStyle(ChatFormatting.GREEN)));
+        tooltipComponents.add(Component.translatable("tooltip.pig_mod.upgrade.level", Component.literal(String.valueOf(level)).withStyle(ChatFormatting.GREEN)).withStyle(ChatFormatting.GRAY));
 
-        tooltipComponents.add(Component.literal("Опыт: ").withStyle(ChatFormatting.GRAY)
-                .append(Component.literal(exp + " / " + expNeeded).withStyle(ChatFormatting.AQUA)));
+        tooltipComponents.add(Component.translatable("tooltip.pig_mod.upgrade.exp", Component.literal(exp + " / " + expNeeded).withStyle(ChatFormatting.AQUA)).withStyle(ChatFormatting.GRAY));
     }
 }

@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": ["IRI", "RPR", "IRI"],
+  "key": {
+    "I": {"item": "minecraft:iron_ingot"},
+    "R": {"item": "minecraft:redstone"},
+    "P": {"item": "minecraft:paper"}
+  },
+  "result": {"id": "pig_mod:control_tablet", "count": 1}
+}

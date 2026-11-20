@@ -3,6 +3,8 @@ package com.example.examplemod.mutation;
 import com.example.examplemod.TameablePigEntity;
 import net.minecraft.world.item.Item;
 
+import net.minecraft.world.item.ItemStack;
+
 import java.util.List;
 import java.util.function.BiConsumer;
 
@@ -24,12 +26,12 @@ public class MutationDefinition {
 
     // ==== Состав синтеза (Генетический Экстрактор) ====
     private final int extractorTier;           // минимальный Tier Экстрактора, на котором можно синтезировать (1-4)
-    private final List<Item> carrierIngredients; // ДНК-носители (1-4 предмета, порядок не важен, дубликаты допустимы)
+    private final List<MutationIngredient> carrierIngredients; // ДНК-носители (1-4 штуки, порядок не важен, дубликаты допустимы)
     private final Item catalystItem;            // катализатор: редстоун / огненный порошок / незеритовая пыль
     private final java.util.function.IntFunction<String> levelBonusDescriber; // необязательно: "+4 HP" и т.п. для UI
 
     public MutationDefinition(String id, String displayNameKey, int maxLevel, int tierMultiplier,
-                               int extractorTier, List<Item> carrierIngredients, Item catalystItem,
+                               int extractorTier, List<MutationIngredient> carrierIngredients, Item catalystItem,
                                BiConsumer<TameablePigEntity, Integer> effectApplier) {
         this(id, displayNameKey, maxLevel, tierMultiplier, extractorTier, carrierIngredients, catalystItem,
                 effectApplier, null);
@@ -40,13 +42,14 @@ public class MutationDefinition {
      * например, "+4 HP" рядом с уровнем). Необязателен: если не нужен, используйте конструктор без него.
      */
     public MutationDefinition(String id, String displayNameKey, int maxLevel, int tierMultiplier,
-                               int extractorTier, List<Item> carrierIngredients, Item catalystItem,
+                               int extractorTier, List<MutationIngredient> carrierIngredients, Item catalystItem,
                                BiConsumer<TameablePigEntity, Integer> effectApplier,
                                java.util.function.IntFunction<String> levelBonusDescriber) {
-        if (carrierIngredients.size() > extractorTier) {
-            // Защита от опечатки при регистрации: носителей не может быть больше, чем слотов на этом Tier'е.
-            throw new IllegalArgumentException("Мутация '" + id + "': ДНК-носителей (" + carrierIngredients.size()
-                    + ") больше, чем слотов у Tier " + extractorTier);
+        if (carrierIngredients.size() != extractorTier) {
+            // Защита от опечатки при регистрации: у Tier N ровно N слотов ДНК-носителей,
+            // и в рецепте мутации этого Tier'а заполнен каждый из них.
+            throw new IllegalArgumentException("Mutation '" + id + "': the number of DNA carriers (" + carrierIngredients.size()
+                    + ") must equal the number of slots of Tier " + extractorTier);
         }
         this.id = id;
         this.displayNameKey = displayNameKey;
@@ -79,8 +82,38 @@ public class MutationDefinition {
         return extractorTier;
     }
 
-    public List<Item> getCarrierIngredients() {
+    public List<MutationIngredient> getCarrierIngredients() {
         return carrierIngredients;
+    }
+
+    /**
+     * Точное (мультимножественное) соответствие выложенных в слоты предметов списку носителей:
+     * порядок слотов не важен, лишних предметов быть не должно. Поддерживает варианты "A / B" —
+     * подбор назначения "предмет -> носитель" перебирается (носителей максимум 4, это мгновенно).
+     *
+     * @param placed только НЕпустые стаки из слотов-носителей
+     */
+    public boolean matchesCarriers(List<ItemStack> placed) {
+        if (placed.size() != carrierIngredients.size()) {
+            return false;
+        }
+        return assign(placed, 0, new boolean[carrierIngredients.size()]);
+    }
+
+    private boolean assign(List<ItemStack> placed, int index, boolean[] used) {
+        if (index == placed.size()) {
+            return true;
+        }
+        for (int j = 0; j < carrierIngredients.size(); j++) {
+            if (!used[j] && carrierIngredients.get(j).test(placed.get(index))) {
+                used[j] = true;
+                if (assign(placed, index + 1, used)) {
+                    return true;
+                }
+                used[j] = false;
+            }
+        }
+        return false;
     }
 
     public Item getCatalystItem() {

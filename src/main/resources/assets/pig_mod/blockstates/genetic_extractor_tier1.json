@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "active=false": {
+      "model": "pig_mod:block/genetic_extractor_tier1"
+    },
+    "active=true": {
+      "model": "pig_mod:block/genetic_extractor_tier1_active"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "pig_mod:item/tameable_pig_spawn_egg"
+  }
+}

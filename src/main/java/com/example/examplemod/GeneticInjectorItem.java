@@ -13,6 +13,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.level.Level;
 
 import java.util.List;
@@ -49,6 +50,15 @@ public class GeneticInjectorItem extends Item {
             tag.putString(TAG_MUTATION_ID, mutationId);
         }
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+
+        // CustomModelData(1) переключает модель предмета на "заряженную" — см. override
+        // в models/item/genetic_injector.json. Без мутации компонент снимается совсем,
+        // а не выставляется в 0, чтобы не оставлять на предмете лишних данных.
+        if (mutationId == null) {
+            stack.remove(DataComponents.CUSTOM_MODEL_DATA);
+        } else {
+            stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(1));
+        }
     }
 
     public static boolean isLoaded(ItemStack stack) {
@@ -76,9 +86,9 @@ public class GeneticInjectorItem extends Item {
                 setLoadedMutationId(injectorStack, null); // разряжаем инжектор
                 pig.level().broadcastEntityEvent(pig, (byte) 7);
                 player.level().playSound(null, pig.blockPosition(), SoundEvents.BREWING_STAND_BREW, SoundSource.PLAYERS, 1.0F, 1.2F);
-                player.sendSystemMessage(Component.literal("§d[Pigs] §fМутация введена! Прокачивай её на Вкладке 2 инвентаря свиньи."));
+                player.sendSystemMessage(Component.translatable("message.pig_mod.injector.injected"));
             } else {
-                player.sendSystemMessage(Component.literal("§c[Pigs] §fЭта мутация уже есть у свиньи (или неизвестна моду)."));
+                player.sendSystemMessage(Component.translatable("message.pig_mod.injector.already"));
             }
         }
         return true;
@@ -98,13 +108,28 @@ public class GeneticInjectorItem extends Item {
         String mutationId = DnaTubeItem.getMutationId(otherStack);
 
         if (mutationId == null) {
-            player.displayClientMessage(Component.literal("Нужна заполненная Пробирка с ДНК во второй руке").withStyle(ChatFormatting.RED), true);
+            player.displayClientMessage(Component.translatable("message.pig_mod.injector.need_tube").withStyle(ChatFormatting.RED), true);
             return InteractionResultHolder.fail(injectorStack);
         }
 
         if (!level.isClientSide) {
             setLoadedMutationId(injectorStack, mutationId);
-            otherStack.shrink(1);
+
+            // Пробирка не исчезает целиком — "перекачиваем" ДНК в инжектор, а на месте
+            // заполненной пробирки остаётся пустая (как шприц, набравший жидкость из ампулы).
+            // Если в руке лежала пачка из нескольких пробирок, забираем только одну из стака,
+            // а пустую пробирку кладём в инвентарь отдельно — заменить ею весь стек в руке
+            // означало бы стереть остальные заполненные пробирки.
+            ItemStack emptyTube = new ItemStack(ModItems.EMPTY_DNA_TUBE.get());
+            if (otherStack.getCount() <= 1) {
+                player.setItemInHand(otherHand, emptyTube);
+            } else {
+                otherStack.shrink(1);
+                if (!player.getInventory().add(emptyTube)) {
+                    player.drop(emptyTube, false);
+                }
+            }
+
             level.playSound(null, player.blockPosition(), SoundEvents.BOTTLE_FILL, SoundSource.PLAYERS, 1.0F, 1.5F);
         }
         return InteractionResultHolder.sidedSuccess(injectorStack, level.isClientSide);
@@ -114,13 +139,13 @@ public class GeneticInjectorItem extends Item {
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         String mutationId = getLoadedMutationId(stack);
         if (mutationId == null) {
-            tooltip.add(Component.literal("Не заряжен").withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.literal("ПКМ, держа заполненную пробирку во второй руке, чтобы зарядить").withStyle(ChatFormatting.DARK_GRAY));
+            tooltip.add(Component.translatable("tooltip.pig_mod.injector.empty").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.translatable("tooltip.pig_mod.injector.charge_hint").withStyle(ChatFormatting.DARK_GRAY));
         } else {
             com.example.examplemod.mutation.MutationDefinition definition = com.example.examplemod.mutation.Mutations.get(mutationId);
             Component name = definition != null ? Component.translatable(definition.getDisplayNameKey()) : Component.literal(mutationId);
-            tooltip.add(Component.literal("Заряжен: ").withStyle(ChatFormatting.GRAY).append(name.copy().withStyle(ChatFormatting.LIGHT_PURPLE)));
-            tooltip.add(Component.literal("ПКМ по своей приручённой свинье, чтобы ввести мутацию").withStyle(ChatFormatting.DARK_GRAY));
+            tooltip.add(Component.translatable("tooltip.pig_mod.injector.charged", name.copy().withStyle(ChatFormatting.LIGHT_PURPLE)).withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.translatable("tooltip.pig_mod.injector.use_hint").withStyle(ChatFormatting.DARK_GRAY));
         }
     }
 }

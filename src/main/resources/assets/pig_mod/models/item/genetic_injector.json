@@ -1,6 +1,14 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:item/brush"
-  }
+    "layer0": "pig_mod:item/genetic_injector"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "custom_model_data": 1
+      },
+      "model": "pig_mod:item/genetic_injector_filled"
+    }
+  ]
 }

@@ -25,6 +25,7 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
@@ -36,6 +37,7 @@ import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.InteractionResult;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
 @Mod(ExampleMod.MODID)
@@ -50,11 +52,6 @@ public class ExampleMod {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
     // Create a Deferred Register to hold CreativeModeTabs which will all be registered under the "examplemod" namespace
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
-
-    // Creates a new Block with the id "examplemod:example_block", combining the namespace and path
-    public static final DeferredBlock<Block> EXAMPLE_BLOCK = BLOCKS.registerSimpleBlock("example_block", BlockBehaviour.Properties.of().mapColor(MapColor.STONE));
-    // Creates a new BlockItem with the id "examplemod:example_block", combining the namespace and path
-    public static final DeferredItem<BlockItem> EXAMPLE_BLOCK_ITEM = ITEMS.registerSimpleBlockItem("example_block", EXAMPLE_BLOCK);
 
     // Creates a new food item with the id "examplemod:example_id", nutrition 1 and saturation 2
     public static final DeferredItem<Item> EXAMPLE_ITEM = ITEMS.registerSimpleItem("example_item", new Item.Properties().food(new FoodProperties.Builder()
@@ -81,13 +78,18 @@ public class ExampleMod {
 
                 // Инструменты
                 output.accept(ModItems.GENETIC_INJECTOR.get());
-                output.accept(ModItems.COURIER_STAFF.get());
+                output.accept(ModItems.CONTROL_TABLET.get());
 
                 // Генетический Экстрактор — все 4 Tier'а, от простого к продвинутому
                 output.accept(ModItems.GENETIC_EXTRACTOR_TIER1_ITEM.get());
                 output.accept(ModItems.GENETIC_EXTRACTOR_TIER2_ITEM.get());
                 output.accept(ModItems.GENETIC_EXTRACTOR_TIER3_ITEM.get());
                 output.accept(ModItems.GENETIC_EXTRACTOR_TIER4_ITEM.get());
+
+                // Пробирки со всеми мутациями — по одной на каждую, в порядке реестра мутаций.
+                for (var holder : ModItems.DNA_TUBES.values()) {
+                    output.accept(holder.get());
+                }
             }).build());
 
     // The constructor for the mod class is the first code that is run when your mod is loaded.
@@ -125,6 +127,19 @@ public class ExampleMod {
         // Сеть: пакет прокачки/удаления мутации с Вкладки 2 инвентаря свиньи (клиент -> сервер)
         modEventBus.addListener(com.example.examplemod.network.ModNetworking::register);
 
+        // Кукла Вуду (Tier 3) — перенаправление урона хозяина на свинью. Это игровое событие
+        // (не на mod event bus), поэтому регистрируем сразу на общей шине NeoForge.
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(PigEventHandlers::onLivingDamagePre);
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(PigEventHandlers::onRiderProtectionDamage);
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(PigEventHandlers::onRiderProtectionEffect);
+        // Нежить: враждебные мобы игнорируют свинью/всадника, пока их не атаковали.
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(PigEventHandlers::onLivingChangeTarget);
+        // Полёт: блокирует ванильное авто-спешивание по Sneak, см. заметку у самого метода.
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(PigEventHandlers::onPigDismountAttempt);
+
+        // Админские команды /pigmod givemutation и /pigmod maxlevel — см. ModCommands.
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(ModCommands::register);
+
         // Register our mod's ModConfigSpec so that FML can create and load the config file for us
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
@@ -145,11 +160,7 @@ public class ExampleMod {
         Config.ITEM_STRINGS.get().forEach((item) -> LOGGER.info("ITEM >> {}", item));
     }
 
-    // Add the example block item to the building blocks tab
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
-            event.accept(EXAMPLE_BLOCK);
-        }
         // Все остальные предметы и блоки мода (свинья, деликатес, мешок, пробирки, инжектор,
         // Генетический Экстрактор) теперь собраны в displayItems() своей вкладки EXAMPLE_TAB выше —
         // так они не разбросаны по чужим вкладкам и их легко найти одним местом в креативе.
@@ -175,6 +186,26 @@ public class ExampleMod {
         net.minecraft.world.entity.Entity target = event.getTarget();
         Player player = event.getEntity();
         ItemStack stack = event.getItemStack();
+
+        // Планшет: Shift+ПКМ по мобу — добавить/убрать его тип из белого списка выбранной свиньи.
+        // Для самой свиньи выбор происходит в TameablePigEntity.mobInteract(), чтобы выбранной
+        // была конкретная сущность, а не просто тип моба.
+        if (stack.is(ModItems.CONTROL_TABLET.get()) && player.isShiftKeyDown() && target instanceof net.minecraft.world.entity.LivingEntity living) {
+            TameablePigEntity pig = null;
+            java.util.UUID selected = PigControlTabletItem.getSelectedPig(stack);
+            if (selected != null && player.level().getEntitiesOfClass(TameablePigEntity.class, player.getBoundingBox().inflate(64)).stream().anyMatch(p -> p.getUUID().equals(selected))) {
+                pig = player.level().getEntitiesOfClass(TameablePigEntity.class, player.getBoundingBox().inflate(64)).stream().filter(p -> p.getUUID().equals(selected)).findFirst().orElse(null);
+            }
+            if (pig != null && living != pig && !(living instanceof Player)) {
+                if (!event.getLevel().isClientSide) {
+                    pig.toggleWhitelistEntityType(living.getType());
+                    player.displayClientMessage(Component.translatable("message.pig_mod.tablet.whitelist_updated"), true);
+                }
+                event.setCanceled(true);
+                event.setCancellationResult(InteractionResult.sidedSuccess(event.getLevel().isClientSide()));
+                return;
+            }
+        }
 
         // 1. Проверяем, что кликнули именно по ОБЫЧНОЙ ванильной свинье
         if (target instanceof Pig vanillaPig) {
@@ -209,7 +240,7 @@ public class ExampleMod {
                             
                             // Делаем игрока хозяином
                             tameablePig.tame(player);
-                            tameablePig.setOrderedToSit(true); // Сажаем её сразу
+                            tameablePig.setCommand(PigCommand.SIT); // Сажаем её сразу и синхронизируем новую систему команд
                             
                             // Спавним новую боевую свинью в мир
                             level.addFreshEntity(tameablePig);
@@ -225,6 +256,20 @@ public class ExampleMod {
                         level.broadcastEntityEvent(vanillaPig, (byte) 6);
                     }
                 }
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public void updateTabletSnapshots(PlayerTickEvent.Post event) {
+        if (event.getEntity().level().isClientSide() || event.getEntity().tickCount % 20 != 0 || !(event.getEntity() instanceof net.minecraft.server.level.ServerPlayer player)) return;
+        net.minecraft.server.level.ServerLevel level=(net.minecraft.server.level.ServerLevel)player.level();
+        for(int slot=0; slot<player.getInventory().getContainerSize(); slot++){
+            ItemStack stack=player.getInventory().getItem(slot);
+            if(!stack.is(ModItems.CONTROL_TABLET.get())) continue;
+            for(java.util.UUID uuid: PigControlTabletItem.getBoundPigs(stack)){
+                net.minecraft.world.entity.Entity entity=level.getEntity(uuid);
+                if(entity instanceof TameablePigEntity pig && pig.isOwnedBy(player)) PigControlTabletItem.updateSnapshot(stack,pig);
             }
         }
     }

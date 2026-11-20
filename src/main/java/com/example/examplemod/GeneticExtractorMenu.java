@@ -42,7 +42,7 @@ public class GeneticExtractorMenu extends AbstractContainerMenu {
             this.addSlot(new Slot(container, 1 + i, carrierSlotX(i), carrierSlotY()));
         }
 
-        // Слот катализатора — только редстоун / огненный порошок / незеритовая пыль (см. isCatalyst)
+        // Слот катализатора — только Редстоун / Огненный порошок / Хорус / Осколок эха (см. isCatalyst)
         this.addSlot(new Slot(container, tier + 1, catalystSlotX(), catalystSlotY()) {
             @Override
             public boolean mayPlace(ItemStack stack) {
@@ -73,9 +73,12 @@ public class GeneticExtractorMenu extends AbstractContainerMenu {
         }
     }
 
-    /** Катализаторы из ТЗ: редстоун, огненный порошок, незеритовая пыль. */
+    /** Катализаторы Tier'ов: Редстоун (T1), Огненный порошок (T2), Хорус (T3), Осколок эха (T4). */
     private static boolean isCatalyst(ItemStack stack) {
-        return stack.is(Items.REDSTONE) || stack.is(Items.BLAZE_POWDER) || stack.is(Items.NETHERITE_SCRAP);
+        return stack.is(Items.REDSTONE)
+                || stack.is(Items.BLAZE_POWDER)
+                || stack.is(Items.CHORUS_FRUIT)
+                || stack.is(Items.ECHO_SHARD);
     }
 
     private static GeneticExtractorBlockEntity resolveBlockEntity(Inventory playerInventory, BlockPos pos) {
@@ -136,6 +139,10 @@ public class GeneticExtractorMenu extends AbstractContainerMenu {
                 placed = this.moveItemStackTo(stack, 0, 1, false);
             } else if (isCatalyst(stack)) {
                 placed = this.moveItemStackTo(stack, tier + 1, tier + 2, false);
+                if (!placed) {
+                    // Слот катализатора занят — предмет может быть и ингредиентом (Осколок эха в T4)
+                    placed = this.moveItemStackTo(stack, 1, tier + 1, false);
+                }
             } else {
                 // По умолчанию считаем, что это потенциальный ДНК-носитель
                 placed = this.moveItemStackTo(stack, 1, tier + 1, false);

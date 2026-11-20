@@ -12,6 +12,8 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockBehaviour.Properties;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.phys.BlockHitResult;
 
 /**
@@ -21,8 +23,22 @@ import net.minecraft.world.phys.BlockHitResult;
  */
 public abstract class GeneticExtractorBlock extends BaseEntityBlock {
 
+    /**
+     * Идёт ли сейчас синтез мутации — тот же приём, что у ванильной печи со свойством
+     * "lit". Пока true, блок показывает модель с активной (прокручивающейся) текстурой
+     * спирали ДНК вместо статичной — см. GeneticExtractorBlockEntity.serverTick и
+     * blockstates/genetic_extractor_tierN.json.
+     */
+    public static final BooleanProperty ACTIVE = BooleanProperty.create("active");
+
     protected GeneticExtractorBlock(Properties properties) {
         super(properties);
+        this.registerDefaultState(this.stateDefinition.any().setValue(ACTIVE, Boolean.FALSE));
+    }
+
+    @Override
+    protected void createBlockStateDefinition(StateDefinition.Builder<net.minecraft.world.level.block.Block, BlockState> builder) {
+        builder.add(ACTIVE);
     }
 
     /** Tier этого конкретного блока (1-4) — определяет число слотов ДНК-носителей и доступные мутации. */
